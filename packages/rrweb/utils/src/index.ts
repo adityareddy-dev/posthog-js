@@ -116,18 +116,26 @@ export function getUntaintedPrototype<T extends keyof BasePrototypeCache>(
     return candidate.prototype as BasePrototypeCache[T];
   }
 
-  const iframeEl = document.createElement('iframe');
-  iframeEl.style.display = 'none';
+  const untaintedObject = getUntaintedIframeValue(key)?.prototype as
+    | BasePrototypeCache[T]
+    | undefined;
+  if (!untaintedObject) return defaultPrototype;
+  return (untaintedBasePrototype[key] = untaintedObject);
+}
+
+function getUntaintedIframeValue<T extends keyof BasePrototypeCache | 'Proxy'>(
+  key: T,
+): (typeof globalThis)[T] | undefined {
+  let iframeEl: HTMLIFrameElement | undefined;
   let keepIframeAttached = false;
   try {
-    document.body.appendChild(iframeEl);
+    iframeEl = document.createElement('iframe');
+    iframeEl.style.display = 'none';
+    (document.body || document.documentElement).appendChild(iframeEl);
     const win = iframeEl.contentWindow;
-    if (!win) return candidate.prototype as BasePrototypeCache[T];
-
-    const untaintedObject = (win as any)[key]
-      .prototype as BasePrototypeCache[T];
-
-    if (!untaintedObject) return defaultPrototype;
+    if (!win) return undefined;
+    const untaintedObject = (win as unknown as Pick<typeof globalThis, T>)[key];
+    if (!untaintedObject) return undefined;
 
     // WebKit tears down an iframe's ScriptExecutionContext when it is detached
     // from the DOM, and MutationObserver.deliver() silently drops callbacks when
@@ -139,7 +147,7 @@ export function getUntaintedPrototype<T extends keyof BasePrototypeCache>(
     // iframe being removed), and the cached prototype must outlive any one of
     // them; removing the shared iframe on the first teardown - or reusing the
     // cache after a stop/restart cycle - would silently break the survivors.
-    if (isWebKit(navigator.userAgent)) {
+    if (key !== 'Proxy' && isWebKit(navigator.userAgent)) {
       // both the upstream default block class and the PostHog one, so the
       // recorder never serializes this iframe whichever config is in use
       iframeEl.classList.add('rr-block', 'ph-no-capture');
@@ -147,14 +155,39 @@ export function getUntaintedPrototype<T extends keyof BasePrototypeCache>(
       keepIframeAttached = true;
     }
 
-    return (untaintedBasePrototype[key] = untaintedObject);
+    return untaintedObject;
   } catch {
-    return defaultPrototype;
+    return undefined;
   } finally {
-    if (!keepIframeAttached && iframeEl.parentNode) {
-      document.body.removeChild(iframeEl);
+    try {
+      if (!keepIframeAttached) iframeEl?.parentNode?.removeChild(iframeEl);
+    } catch {
+      // A patched DOM method must not prevent returning the clean value.
     }
   }
+}
+
+let untaintedProxy: ProxyConstructor | undefined;
+
+export function getUntaintedProxy(): ProxyConstructor {
+  if (untaintedProxy) return untaintedProxy;
+  const defaultProxy = globalThis.Proxy;
+  try {
+    if (
+      typeof defaultProxy === 'function' &&
+      // Bound replacements also stringify as native code, so check the name.
+      /^function\s+Proxy\s*\(\s*\)\s*\{\s*\[native code\]\s*\}$/.test(
+        Function.prototype.toString.call(defaultProxy),
+      )
+    ) {
+      return (untaintedProxy = defaultProxy);
+    }
+  } catch {
+    // Recover from an iframe if checking the page's constructor fails.
+  }
+  const cleanProxy = getUntaintedIframeValue('Proxy');
+  if (!cleanProxy) return defaultProxy;
+  return (untaintedProxy = cleanProxy);
 }
 
 // Group by prototype so every node access can reuse the property key instead

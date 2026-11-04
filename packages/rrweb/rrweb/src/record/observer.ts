@@ -54,7 +54,7 @@ import type {
 } from '@posthog/rrweb-types';
 import MutationBuffer from './mutation';
 import { callbackWrapper } from './error-handler';
-import dom, { mutationObserverCtor } from '@posthog/rrweb-utils';
+import dom, { getUntaintedProxy, mutationObserverCtor } from '@posthog/rrweb-utils';
 
 export const mutationBuffers: MutationBuffer[] = [];
 
@@ -774,6 +774,7 @@ function initStyleSheetObserver(
     };
   }
 
+  const Proxy = getUntaintedProxy();
   const insertRule = win.CSSStyleSheet.prototype.insertRule;
   win.CSSStyleSheet.prototype.insertRule = new Proxy(insertRule, {
     apply: callbackWrapper(
@@ -1217,6 +1218,7 @@ function initStyleDeclarationObserver(
     mutationQueue,
   }: { win: IWindow; mutationQueue: StyleSheetMutationQueue },
 ): listenerHandler {
+  const Proxy = getUntaintedProxy();
   const setProperty = win.CSSStyleDeclaration.prototype.setProperty;
   win.CSSStyleDeclaration.prototype.setProperty = new Proxy(setProperty, {
     apply: callbackWrapper(

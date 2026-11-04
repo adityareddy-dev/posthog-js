@@ -17,7 +17,7 @@ import {
   classMatchesRegex,
 } from '@posthog/rrweb-snapshot';
 import { RRNode, RRIFrameElement, BaseRRNode } from '@posthog/rrdom';
-import dom from '@posthog/rrweb-utils';
+import dom, { getUntaintedProxy } from '@posthog/rrweb-utils';
 
 export function on(
   type: string,
@@ -112,6 +112,7 @@ export let _mirror: DeprecatedMirror = {
   },
 };
 if (typeof window !== 'undefined' && window.Proxy && window.Reflect) {
+  const Proxy = getUntaintedProxy();
   _mirror = new Proxy(_mirror, {
     get(target, prop, receiver) {
       if (prop === 'map') {
