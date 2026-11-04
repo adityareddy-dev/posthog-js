@@ -167,3 +167,51 @@ describe('initObservers teardown', () => {
     expect(pluginCleanup).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('media interaction targets', () => {
+  it.each(['play', 'pause', 'seeked', 'volumechange', 'ratechange'])(
+    'ignores %s events on non-media elements',
+    (type) => {
+      const options = createOptions();
+      options.recordDOM = false;
+      const mediaInteractionCb = options.mediaInteractionCb;
+      const target = document.createElement('div');
+      document.body.appendChild(target);
+      const cleanup = initObservers(options);
+      try {
+        target.dispatchEvent(new Event(type));
+        expect(mediaInteractionCb).not.toHaveBeenCalled();
+      } finally {
+        cleanup();
+        target.remove();
+      }
+    },
+  );
+
+  it.each(['audio', 'video'])(
+    'still records %s events in a same-origin iframe',
+    (tagName) => {
+      const frame = document.createElement('iframe');
+      document.body.appendChild(frame);
+      const doc = frame.contentDocument!;
+      const win = frame.contentWindow as Window & typeof globalThis;
+      const target = doc.createElement(tagName) as HTMLMediaElement;
+      doc.body.appendChild(target);
+      expect(target).not.toBeInstanceOf(HTMLMediaElement);
+      const options = createOptions(doc);
+      options.recordDOM = false;
+      const mediaInteractionCb = options.mediaInteractionCb;
+      const cleanup = initObservers(options);
+      try {
+        target.dispatchEvent(new win.Event('play'));
+        expect(mediaInteractionCb).toHaveBeenCalledTimes(1);
+        expect(mediaInteractionCb).toHaveBeenCalledWith(
+          expect.objectContaining({ currentTime: 0, volume: 1 }),
+        );
+      } finally {
+        cleanup();
+        frame.remove();
+      }
+    },
+  );
+});

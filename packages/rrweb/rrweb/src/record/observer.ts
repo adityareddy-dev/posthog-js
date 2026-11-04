@@ -1317,18 +1317,19 @@ function initMediaInteractionObserver({
   sampling,
   doc,
 }: observerParam): listenerHandler {
+  const win = doc.defaultView as IWindow;
   const handler = callbackWrapper((type: MediaInteractions) =>
     throttle(
       callbackWrapper((event: Event) => {
         const target = getEventTarget(event);
         if (
           !target ||
+          !(target instanceof win.HTMLMediaElement) ||
           isBlocked(target as Node, blockClass, blockSelector, true)
         ) {
           return;
         }
-        const { currentTime, volume, muted, playbackRate, loop } =
-          target as HTMLMediaElement;
+        const { currentTime, volume, muted, playbackRate, loop } = target;
         mediaInteractionCb({
           type,
           id: mirror.getId(target as Node),

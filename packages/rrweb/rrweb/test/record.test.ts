@@ -1731,6 +1731,32 @@ describe('record', function (this: ISuite) {
     expect(flushed.length).toEqual(1);
   });
 
+  it('does not record media events dispatched on non-media elements', async () => {
+    await ctx.page.evaluate(() => {
+      const target = document.createElement('div');
+      document.body.appendChild(target);
+      const { record } = (window as unknown as IWindow).rrweb;
+      record({ emit: (window as unknown as IWindow).emit });
+      for (const type of [
+        'play',
+        'pause',
+        'seeked',
+        'volumechange',
+        'ratechange',
+      ]) {
+        target.dispatchEvent(new Event(type));
+      }
+    });
+    await waitForRAF(ctx.page);
+
+    const mediaEvents = ctx.events.filter(
+      (event) =>
+        event.type === EventType.IncrementalSnapshot &&
+        event.data.source === IncrementalSource.MediaInteraction,
+    );
+    expect(mediaEvents).toEqual([]);
+  });
+
   describe('loading stylesheets', () => {
     let server: Server;
     let serverURL: string;
