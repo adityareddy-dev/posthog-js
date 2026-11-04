@@ -299,6 +299,8 @@ function buildNode(
               'rrweb-original-srcset',
               n.attributes.srcset as string,
             );
+          } else if (tagName === 'iframe' && name === 'srcdoc') {
+            // Recorded iframe content is rebuilt separately; avoid a competing native load.
           } else {
             node.setAttribute(name, value.toString());
           }

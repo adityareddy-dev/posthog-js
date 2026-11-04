@@ -54,6 +54,28 @@ describe('rebuild', function () {
     cache = createCache();
   });
 
+  it('omits iframe srcdoc while preserving the other recorded attributes', () => {
+    const attributes = {
+      srcdoc: '<html><body>native content</body></html>',
+      title: 'recorded frame',
+      'data-frame': 'example',
+    };
+    const node = buildNodeWithSN(
+      {
+        id: 1,
+        tagName: 'iframe',
+        type: NodeType.Element,
+        attributes,
+        childNodes: [],
+      },
+      { doc: document, mirror, hackCss: false, cache },
+    ) as HTMLIFrameElement;
+    expect(node.hasAttribute('srcdoc')).toBe(false);
+    expect(node.getAttribute('title')).toBe('recorded frame');
+    expect(node.getAttribute('data-frame')).toBe('example');
+    expect(attributes.srcdoc).toBe('<html><body>native content</body></html>');
+  });
+
   describe('rr_dataURL', function () {
     it('should rebuild dataURL', function () {
       const dataURI =
