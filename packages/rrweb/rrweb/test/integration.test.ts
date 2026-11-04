@@ -423,6 +423,61 @@ describe('record integration tests', function (this: ISuite) {
     await assertSnapshot(page);
   });
 
+  it('masks initial and updated placeholders while preserving removal', async () => {
+    const page = await browser.newPage();
+    try {
+      await page.setContent(
+        '<input placeholder="private input"><textarea placeholder="private text"></textarea>',
+      );
+      await page.evaluate(code);
+      const events = await page.evaluate(async () => {
+        const events: eventWithTime[] = [];
+        const { record } = (
+          window as unknown as { rrweb: typeof import('../src') }
+        ).rrweb;
+        const stop = record({
+          maskAllInputs: true,
+          emit: (event) => events.push(event),
+        })!;
+        const input = document.querySelector('input')!;
+        const textarea = document.querySelector('textarea')!;
+        input.setAttribute('placeholder', 'updated secret');
+        textarea.setAttribute('placeholder', 'updated secret');
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        input.removeAttribute('placeholder');
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        stop();
+        return events;
+      });
+      const fullSnapshot = events.find(
+        (event) => event.type === EventType.FullSnapshot,
+      )!;
+      if (fullSnapshot.type !== EventType.FullSnapshot)
+        throw new Error('missing snapshot');
+      const placeholders: unknown[] = [];
+      visitSnapshot(fullSnapshot.data.node, (node) => {
+        if (
+          node.type === NodeType.Element &&
+          'placeholder' in node.attributes
+        ) {
+          placeholders.push(node.attributes.placeholder);
+        }
+      });
+      expect(placeholders).toEqual(['*'.repeat(13), '*'.repeat(12)]);
+      const updates = events.flatMap((event) =>
+        event.type === EventType.IncrementalSnapshot &&
+        event.data.source === IncrementalSource.Mutation
+          ? event.data.attributes.map(
+              (attribute) => attribute.attributes.placeholder,
+            )
+          : [],
+      );
+      expect(updates).toEqual(['*'.repeat(14), '*'.repeat(14), null]);
+    } finally {
+      await page.close();
+    }
+  });
+
   it('should not record input values if maskAllInputs is enabled', async () => {
     const page: puppeteer.Page = await browser.newPage();
     await page.goto('about:blank');

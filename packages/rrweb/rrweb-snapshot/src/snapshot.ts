@@ -1004,6 +1004,19 @@ function serializeElementNode(
       attributes.checked = checked;
     }
   }
+  if (
+    (tagName === 'input' || tagName === 'textarea') &&
+    attributes.placeholder
+  ) {
+    attributes.placeholder = maskInputValue({
+      element: n as HTMLElement,
+      type: getInputType(n as HTMLElement),
+      tagName,
+      value: attributes.placeholder as string,
+      maskInputOptions,
+      maskInputFn,
+    });
+  }
   if (tagName === 'option') {
     if ((n as HTMLOptionElement).selected && !maskInputOptions['select']) {
       attributes.selected = true;

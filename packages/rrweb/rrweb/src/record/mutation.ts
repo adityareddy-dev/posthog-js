@@ -768,7 +768,12 @@ export default class MutationBuffer {
           ? target.getAttributeNS(attributeNamespace, sourceAttributeName)
           : (m.target as Element).getAttribute(sourceAttributeName);
 
-        if (attributeName === 'value') {
+        if (
+          attributeName === 'value' ||
+          (attributeName === 'placeholder' &&
+            value !== null &&
+            (tagNameLower === 'input' || tagNameLower === 'textarea'))
+        ) {
           const htmlTarget = target as HTMLElement;
           const type = getInputType(htmlTarget);
 
