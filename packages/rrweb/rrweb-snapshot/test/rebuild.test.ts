@@ -55,6 +55,35 @@ describe('rebuild', function () {
   });
 
   describe('rr_dataURL', function () {
+    it('rebuilds an inlined image when currentSrc is unavailable', () => {
+      const currentSrc = vi
+        .spyOn(HTMLImageElement.prototype, 'currentSrc', 'get')
+        .mockReturnValue(undefined as unknown as string);
+      const dataURI =
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+      try {
+        const node = buildNodeWithSN(
+          {
+            id: 1,
+            tagName: 'img',
+            type: NodeType.Element,
+            attributes: {
+              rr_dataURL: dataURI,
+              src: 'http://example.com/image.png',
+            },
+            childNodes: [],
+          },
+          { doc: document, mirror, hackCss: false, cache },
+        ) as HTMLImageElement;
+        expect(node.src).toBe(dataURI);
+        expect(node.getAttribute('rrweb-original-src')).toBe(
+          'http://example.com/image.png',
+        );
+      } finally {
+        currentSrc.mockRestore();
+      }
+    });
+
     it('should rebuild dataURL', function () {
       const dataURI =
         'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
