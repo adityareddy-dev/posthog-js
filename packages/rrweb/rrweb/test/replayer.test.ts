@@ -1014,9 +1014,10 @@ describe('replayer', function () {
     expect(status).toEqual('live');
   });
 
-  it("shouldn't trigger ReplayerEvents.Finish in live mode", async () => {
-    const status = await page.evaluate((FinishState) => {
-      return new Promise((resolve) => {
+  it('keeps the live clock running without finishing after the last event', async () => {
+    const { status, timeProgress } = await page.evaluate((FinishState) => {
+      type LiveStatus = { status: boolean; timeProgress: number };
+      return new Promise<LiveStatus>((resolve) => {
         const win = window as IWindow;
         let triggeredFinish = false;
         const { Replayer } = win.rrweb;
@@ -1029,12 +1030,19 @@ describe('replayer', function () {
         replayer.startLive();
         replayer.addEvent(win.events[0]);
         requestAnimationFrame(() => {
-          resolve(triggeredFinish);
+          const afterLastEventTime = replayer.getCurrentTime();
+          requestAnimationFrame(() => {
+            resolve({
+              status: triggeredFinish,
+              timeProgress: replayer.getCurrentTime() - afterLastEventTime,
+            });
+          });
         });
       });
     }, ReplayerEvents.Finish);
 
     expect(status).toEqual(false);
+    expect(timeProgress).toBeGreaterThan(0);
   });
 
   it('applies a huge add mutation with sibling order intact', async () => {

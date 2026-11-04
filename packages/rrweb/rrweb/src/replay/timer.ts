@@ -52,6 +52,13 @@ export class Timer {
     this.raf = requestAnimationFrame(this.rafCheck.bind(this));
   }
 
+  public updateLiveTime(): void {
+    if (this.raf === true) {
+      // Update the idle live clock without restarting the animation loop.
+      this.rafCheck();
+    }
+  }
+
   private rafCheck() {
     const time = performance.now();
     this.timeOffset += (time - this.lastTimestamp) * this.speed;
